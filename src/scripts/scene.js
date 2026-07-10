@@ -311,13 +311,44 @@ export function initScene(canvas) {
   // keeps the same outer extent (still populates the wide desktop slope,
   // where the ribbon's own x -8..17 band lives) while roughly doubling
   // particle density near x=0, so mobile's narrow visible window still
-  // catches a visible cluster. Particle counts are unchanged from the brief.
-  const mistCount = isMobile ? 120 : 260;
+  // catches a visible cluster.
+  //
+  // Reshaped from speckle into billows (controller review, billow fix):
+  // the earlier 120/260 small wisp-sprites read in a static hero still as
+  // dozens of discrete soft DOTS -- bokeh/snow speckle -- sprinkled across
+  // the mountain body, not drifting atmosphere. Rebuilt as a few broad
+  // overlapping fog patches instead: count cut to 15/24 (mobile/desktop,
+  // keeping the mobile-reduction pattern), each sprite scaled to a large
+  // soft veil patch (see `size` on the material below) at whisper opacity,
+  // so mist only registers where several patches overlap into a billowing
+  // mass. The band is also lowered from y 1..6 (mid-slope, competing with
+  // the mountain body and the ribbon's y 1.6..6.5 draped path) to roughly
+  // y 0.4..2.4 -- the base/fog line and lower flanks where mist naturally
+  // pools -- keeping the billows off the ribbon's arc so the stroke stays
+  // clean.
+  //
+  // Placement is cluster-based rather than a free random scatter: a free
+  // draw of only ~24 whisper-opacity sprites cannot guarantee the
+  // several-sprite overlaps the effect needs to register (verified
+  // empirically -- a free low-band scatter at these magnitudes was only
+  // perceptible under contrast stretching). Sprites are jittered around
+  // three fixed low-flank centers -- left flank, center (inside the
+  // ~+/-4-unit window mobile's narrow frustum can see, per the frustum
+  // note above), and right flank under the watermark -- so each cluster
+  // reliably accumulates into one soft fog mass, while the triangular
+  // jitter keeps the masses organic rather than circular.
+  const mistClusters = [
+    { x: -9, y: 1.1, z: -6 },
+    { x: 1.5, y: 1.0, z: -8 },
+    { x: 11, y: 1.4, z: -10 },
+  ];
+  const mistCount = isMobile ? 15 : 24;
   const mistPos = new Float32Array(mistCount * 3);
   for (let i = 0; i < mistCount; i++) {
-    mistPos[i * 3] = (Math.random() + Math.random() - 1) * 25;
-    mistPos[i * 3 + 1] = Math.random() * 5.0 + 1.0;
-    mistPos[i * 3 + 2] = (Math.random() - 0.5) * 12 - 9;
+    const c = mistClusters[i % mistClusters.length];
+    mistPos[i * 3] = c.x + (Math.random() + Math.random() - 1) * 3.5;
+    mistPos[i * 3 + 1] = c.y + (Math.random() - 0.5) * 1.2;
+    mistPos[i * 3 + 2] = c.z + (Math.random() - 0.5) * 3;
   }
   const mistGeo = new THREE.BufferGeometry();
   mistGeo.setAttribute('position', new THREE.BufferAttribute(mistPos, 3));
@@ -329,9 +360,16 @@ export function initScene(canvas) {
   // than CREAM (242,239,233) -- so the same sprite reads as a bright wisp
   // against the dark mountain body and a soft muted smudge against the
   // cream sky, instead of vanishing into one or the other.
+  //
+  // Falloff softened (billow fix): alpha now starts at a modest 0.4 and
+  // reaches fully transparent by the 0.55-radius stop, leaving the outer
+  // ~45% of the sprite completely clear -- no circular edge is perceivable
+  // at any overlap, which is what let the old harder-edged gradient
+  // (0.9 center, still 0.55 alpha at 0.6 radius) read as distinct dots.
   const grad = mctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, 'rgba(222,213,198,0.9)');
-  grad.addColorStop(0.6, 'rgba(222,213,198,0.55)');
+  grad.addColorStop(0, 'rgba(222,213,198,0.4)');
+  grad.addColorStop(0.3, 'rgba(222,213,198,0.2)');
+  grad.addColorStop(0.55, 'rgba(222,213,198,0)');
   grad.addColorStop(1, 'rgba(222,213,198,0)');
   mctx.fillStyle = grad;
   mctx.fillRect(0, 0, 64, 64);
@@ -359,26 +397,27 @@ export function initScene(canvas) {
   // the gray mountain body and the ribbon draped on it no longer visible
   // through it.
   //
-  // Fix keeps every structural choice above (near z band, triangular
-  // center-weighted x spread, warm-gray tint, depthTest: false) and only
-  // shrinks magnitude: size down from 12 to 2.2 world units (a sprite
-  // small enough at this distance to read as an individual wisp instead of
-  // a screen-filling wash) and opacity down from 0.85 to 0.22 (soft haze
-  // rather than a solid veil even where dozens of sprites overlap).
-  // Particle counts are untouched (still isMobile ? 120 : 260, per the
-  // brief). Re-verified against fresh renders at 390/768/1440: the gray
-  // mountain body and the crimson ribbon draped on it both read clearly
-  // through the mist, while soft pale wisps are still visible drifting
-  // over the mid-slope.
+  // Magnitudes (billow fix, superseding the earlier size 2.2/opacity 0.22
+  // whiteout retune, which fixed the veil but left the mist reading as
+  // speckle): size 7 world units -- each sprite is a broad soft fog
+  // patch at this ~18-30 unit camera distance, not an individual dot --
+  // at opacity 0.12, faint enough that a lone patch barely registers and
+  // the visible billows are the several-patch overlaps each cluster
+  // guarantees along the base/fog line (see the cluster comment above).
+  // The ribbon draws above this layer regardless (ribbon.renderOrder = 1),
+  // so the crimson stroke stays crisp. Re-verified against fresh renders
+  // at 390/768/1440: no individually distinguishable circles, soft fog
+  // masses perceptible against the lower slope, mountain body and ribbon
+  // untouched by haze.
   const mist = new THREE.Points(
     mistGeo,
     new THREE.PointsMaterial({
       map: new THREE.CanvasTexture(mistTexCanvas),
-      size: 2.2,
+      size: 7,
       transparent: true,
       depthWrite: false,
       depthTest: false,
-      opacity: 0.22,
+      opacity: 0.12,
     })
   );
   scene.add(mist);
