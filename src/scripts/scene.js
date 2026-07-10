@@ -80,6 +80,7 @@ const RIBBON_FRAG = /* glsl */ `
   uniform float uTime;
   uniform float uDraw;
   uniform vec3 uColor;
+  uniform float uScrollFade;
   varying vec2 vUv;
   varying vec3 vNormal;
   varying vec3 vView;
@@ -96,7 +97,7 @@ const RIBBON_FRAG = /* glsl */ `
     // instead of smoothstep(1.0, 0.92, x), which rendered correctly only by
     // driver coincidence.
     float taper = smoothstep(0.0, 0.08, vUv.x) * (1.0 - smoothstep(0.92, 1.0, vUv.x));
-    float alpha = (0.5 + 0.5 * flow) * taper;
+    float alpha = (0.5 + 0.5 * flow) * taper * uScrollFade;
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -266,6 +267,7 @@ export function initScene(canvas) {
       uTime: { value: 0 },
       uDraw: { value: 1 },
       uColor: { value: new THREE.Color(CRIMSON) },
+      uScrollFade: { value: 1 },
     },
     transparent: true,
     depthWrite: false,
@@ -448,6 +450,14 @@ export function initScene(canvas) {
     fogDensity.value = 0.05 + scroll.p * 0.05;
     camera.lookAt(0, 4 - scroll.p * 2.5, 0);
     ribbonMat.uniforms.uTime.value = t * 0.001;
+    // Brand-stroke dissolve: the ribbon is fully present through the hero
+    // (scroll.p == 0) and fades out as the About tease section scrolls in,
+    // fully gone before the About text is centered (scroll.p >= 0.85). This
+    // is the fix for the ribbon crossing straight through the About heading
+    // at 390px, where camera pullback alone can't clear it -- see
+    // shots/390-tease.png.
+    ribbonMat.uniforms.uScrollFade.value =
+      1.0 - THREE.MathUtils.smoothstep(scroll.p, 0.35, 0.85);
     mist.rotation.y = t * 0.000012;
     renderer.render(scene, camera);
   }
