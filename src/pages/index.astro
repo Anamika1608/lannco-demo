@@ -1,10 +1,70 @@
+---
+import '@fontsource/cormorant-garamond/500.css';
+import '@fontsource/cormorant-garamond/600.css';
+import '@fontsource/jost/300.css';
+import '@fontsource/jost/400.css';
+import '../styles/global.css';
+---
+
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="LANNCO — independent cross-border advisory. Connecting capital, markets, and people."
+    />
     <title>LANNCO — Connecting Capital. Markets. People.</title>
   </head>
   <body>
-    <p>LANNCO</p>
+    <canvas id="scene" aria-hidden="true"></canvas>
+
+    <header class="nav">
+      <a class="wordmark" href="/">LANNCO</a>
+      <nav class="links">
+        <a href="#about">About</a>
+        <a href="#">Capabilities</a>
+        <a href="#">Sectors</a>
+        <a href="#">Journal</a>
+        <a href="#">Contact</a>
+      </nav>
+      <span class="seal" aria-hidden="true">嵐</span>
+    </header>
+
+    <main>
+      <section class="hero">
+        <span class="watermark" aria-hidden="true">嵐</span>
+        <h1 class="headline">
+          <span class="line"><span class="line-inner">Connecting</span></span>
+          <span class="line"><span class="line-inner">Capital.</span></span>
+          <span class="line"><span class="line-inner">Markets.</span></span>
+          <span class="line"><span class="line-inner accent">People.</span></span>
+        </h1>
+        <a class="discover" href="#about">Discover more <span class="arrow">→</span></a>
+        <span class="scroll-hint">Scroll to explore</span>
+        <div class="ticker" aria-hidden="true">
+          <span>Asia</span>
+          <span>Middle East</span>
+          <span>Europe</span>
+          <span>Africa</span>
+          <i class="ticker-line"></i>
+        </div>
+      </section>
+
+      <section class="tease" id="about">
+        <h2 class="about-title">About LANNCO</h2>
+        <p class="about-line">
+          We are an independent cross-border advisory and strategic introductions platform.
+        </p>
+        <p class="about-line">
+          Connecting capital, markets, and people across Asia, the Middle East, Europe and Africa.
+        </p>
+        <p class="about-line">
+          We operate with discretion, integrity, and a deep understanding of cultures, markets,
+          and relationships.
+        </p>
+        <a class="discover" href="#">Our story <span class="arrow">→</span></a>
+      </section>
+    </main>
   </body>
 </html>
