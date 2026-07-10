@@ -88,7 +88,10 @@ const RIBBON_FRAG = /* glsl */ `
     float flow = 0.5 + 0.5 * sin(vUv.x * 22.0 - uTime * 2.2);
     float fres = pow(1.0 - abs(dot(normalize(vNormal), normalize(vView))), 2.0);
     vec3 col = uColor * (0.72 + 0.42 * flow) + fres * 0.3;
-    float alpha = 0.5 + 0.5 * flow;
+    // Brushstroke taper: dissolve the ends over the first/last ~8% of the
+    // ribbon's length instead of a hard-edged tube cap.
+    float taper = smoothstep(0.0, 0.08, vUv.x) * smoothstep(1.0, 0.92, vUv.x);
+    float alpha = (0.5 + 0.5 * flow) * taper;
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -180,6 +183,24 @@ export function initScene(canvas) {
   // frustum math still clips all but a sliver of it (confirmed empirically
   // in shots/768-hero.png), because the frustum width that matters here
   // tracks aspect ratio, not the width breakpoint used to cut render cost.
+  //
+  // Fix (controller review, this pass): the desktop curve above rode too
+  // far right/high (x 6-15, y 4-8) -- above the terrain's falloff instead of
+  // on it, so it read as a short thin arc floating in the sky next to the
+  // watermark, disconnected from the mountain. Re-shaped (see the formula
+  // and its own comment below) to start low/left near the fog line on the
+  // mountain's left flank, rise under the summit, drape in a two-fold S
+  // across the mid-slope, and exit right into the watermark's screen zone,
+  // with z kept in a -5.5..-10 band -- the front ridge's camera-facing near
+  // slope -- instead of hugging the peak's z=-14 depth center, so the tube
+  // renders against the visible slope face rather than arcing above it in
+  // open sky. The x=-3 headline-collision floor documented above was for
+  // the *old*, higher/farther curve; the new curve's start (x=-8) tested
+  // clear of the headline anyway because it also sits much lower/nearer,
+  // off the headline's screen band (see verification below). Radius is
+  // desktop-only 0.24 (~1.85x the shared 0.13 this file used previously)
+  // -- mobile's radius and curve are untouched because 390-hero.png already
+  // reads as bold, draped silk.
   const wideFrustum = window.innerWidth / window.innerHeight >= 1.2;
   const ribbonPts = [];
   if (!wideFrustum) {
@@ -194,21 +215,42 @@ export function initScene(canvas) {
       );
     }
   } else {
-    for (let i = 0; i <= 10; i++) {
-      const t = i / 10;
+    // Round 3's 7 sparse hand-picked control points reintroduced the same
+    // Catmull-Rom overshoot as round 1's first attempt: whenever a single
+    // control point is simultaneously the sharp turning point for *two*
+    // axes at once (there, P2 was both y's local max and z's local min),
+    // the spline's tangent through it overshoots into a small hooked loop
+    // -- confirmed twice now by rendering and reading the screenshot (a
+    // short disconnected red "C" near the summit, apart from the main
+    // curve). Densely-sampled continuous formulas (as the original
+    // pre-fix code and this file's mobile branch both use) don't have this
+    // problem because consecutive samples are close together, so no single
+    // point carries a sharp multi-axis reversal.
+    //
+    // Round 4 (this one) goes back to a formula, sampled at 16 segments,
+    // shaped to start low/left near the fog line on the mountain's left
+    // flank, rise under the summit, drape down-then-up across the
+    // mid-slope (y's two-fold sine), and exit right into the watermark's
+    // screen zone -- while keeping z in the -5.5..-10 band established in
+    // round 3 as safely clear of both the near-camera foreshortening
+    // artifact (round 2's z=-3) and the peak's far z=-14 depth center
+    // (the original bug this whole fix addresses).
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16;
       ribbonPts.push(
         new THREE.Vector3(
-          THREE.MathUtils.lerp(-3, 15, t),
-          4.0 + Math.sin(t * Math.PI * 1.8) * 1.6 + t * 1.2,
-          -14 + Math.sin(t * Math.PI * 1.2) * 2.2
+          THREE.MathUtils.lerp(-8, 17, t),
+          1.6 + Math.sin(t * Math.PI * 2.0) * 2.2 + Math.sin(t * Math.PI) * 0.9,
+          -7.5 + Math.sin(t * Math.PI * 1.15) * 2.6 - t * 1.2
         )
       );
     }
   }
+  const ribbonRadius = wideFrustum ? 0.24 : 0.13;
   const ribbonGeo = new THREE.TubeGeometry(
     new THREE.CatmullRomCurve3(ribbonPts),
     isMobile ? 140 : 240,
-    0.13,
+    ribbonRadius,
     12,
     false
   );
