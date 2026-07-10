@@ -272,6 +272,15 @@ export function initScene(canvas) {
     side: THREE.DoubleSide,
   });
   const ribbon = new THREE.Mesh(ribbonGeo, ribbonMat);
+  // renderOrder above the mist's default (0): both materials use
+  // depthTest: false, so draw order -- not depth -- decides who wins where
+  // they overlap. Without this, the mist (added after the ribbon, below)
+  // composites over the crimson stroke and hazes it. An explicit
+  // renderOrder is used instead of relying on scene.add() call order,
+  // because transparent objects at differing distances from the camera can
+  // otherwise still get resorted back-to-front by Three's default
+  // transparency sort.
+  ribbon.renderOrder = 1;
   scene.add(ribbon);
 
   // Mist band repositioned (controller review, mist-visibility fix): the
@@ -335,15 +344,41 @@ export function initScene(canvas) {
   // none), so mist is drawn as a front atmospheric layer that always wins,
   // consistent with "drifting mist" reading as a layer in front of the
   // mountain rather than a set of objects embedded in its geometry.
+  //
+  // size/opacity retuned (controller review, whiteout fix): the position
+  // move above (z from -26..-6 to -15..-3, i.e. much nearer the camera at
+  // z~15) kept the old far-placement magnitudes -- size 12, opacity 0.85 --
+  // which were never re-tuned for the shorter camera distance. With
+  // sizeAttenuation (PointsMaterial's default), `size` is a world-unit
+  // sprite diameter whose *screen* size grows as the particle nears the
+  // camera; at ~18-30 world units out (this band's actual range) a 12-unit
+  // sprite covers roughly 85% of the viewport's height, and 120-260 of them
+  // at opacity 0.85 with depthTest: false accumulate into a near-opaque
+  // cream veil -- confirmed empirically: the mid-slope sampled at
+  // rgb(240,235,228), i.e. essentially CREAM, at 1440/768/390 alike, with
+  // the gray mountain body and the ribbon draped on it no longer visible
+  // through it.
+  //
+  // Fix keeps every structural choice above (near z band, triangular
+  // center-weighted x spread, warm-gray tint, depthTest: false) and only
+  // shrinks magnitude: size down from 12 to 2.2 world units (a sprite
+  // small enough at this distance to read as an individual wisp instead of
+  // a screen-filling wash) and opacity down from 0.85 to 0.22 (soft haze
+  // rather than a solid veil even where dozens of sprites overlap).
+  // Particle counts are untouched (still isMobile ? 120 : 260, per the
+  // brief). Re-verified against fresh renders at 390/768/1440: the gray
+  // mountain body and the crimson ribbon draped on it both read clearly
+  // through the mist, while soft pale wisps are still visible drifting
+  // over the mid-slope.
   const mist = new THREE.Points(
     mistGeo,
     new THREE.PointsMaterial({
       map: new THREE.CanvasTexture(mistTexCanvas),
-      size: 12,
+      size: 2.2,
       transparent: true,
       depthWrite: false,
       depthTest: false,
-      opacity: 0.85,
+      opacity: 0.22,
     })
   );
   scene.add(mist);
