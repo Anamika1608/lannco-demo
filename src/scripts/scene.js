@@ -89,8 +89,13 @@ const RIBBON_FRAG = /* glsl */ `
     float fres = pow(1.0 - abs(dot(normalize(vNormal), normalize(vView))), 2.0);
     vec3 col = uColor * (0.72 + 0.42 * flow) + fres * 0.3;
     // Brushstroke taper: dissolve the ends over the first/last ~8% of the
-    // ribbon's length instead of a hard-edged tube cap.
-    float taper = smoothstep(0.0, 0.08, vUv.x) * smoothstep(1.0, 0.92, vUv.x);
+    // ribbon's length instead of a hard-edged tube cap. Written with both
+    // smoothstep calls in ascending edge order (edge0 < edge1) -- GLSL ES
+    // leaves reversed-edge smoothstep (edge0 > edge1) spec-undefined, so the
+    // trailing-edge fade is expressed as (1.0 - smoothstep(0.92, 1.0, x))
+    // instead of smoothstep(1.0, 0.92, x), which rendered correctly only by
+    // driver coincidence.
+    float taper = smoothstep(0.0, 0.08, vUv.x) * (1.0 - smoothstep(0.92, 1.0, vUv.x));
     float alpha = (0.5 + 0.5 * flow) * taper;
     gl_FragColor = vec4(col, alpha);
   }
@@ -269,28 +274,67 @@ export function initScene(canvas) {
   const ribbon = new THREE.Mesh(ribbonGeo, ribbonMat);
   scene.add(ribbon);
 
-  // Mist box shifted with the ridge (front-edge delta -14, see ribbon comment
-  // above) so the drift sits at the base of the now-farther-away front ridge
-  // instead of floating disconnected from it; x/y spread and particle counts
-  // are unchanged from the brief.
+  // Mist band repositioned (controller review, mist-visibility fix): the
+  // brief's y -1.2..1.3 / z -26..-6 band sat at the mountain's base, which
+  // RIDGE_FRAG shades close to uFogColor there (shade = smoothstep(0,9,vH)
+  // is near-zero at low vH) -- i.e. almost exactly CREAM. Combined with the
+  // sprite's near-white gradient, the particles had no luminance contrast
+  // against *either* the background or the terrain, so they were invisible
+  // in stills even though the diagnostic (opaque-red) render proved the
+  // particle system itself was rendering and clustering correctly.
+  //
+  // Fix is structural, not opacity: raise y into the mid-slope band (roughly
+  // 1..6, matched to the ribbon's own y 1.6..6.5 band above, which is
+  // already verified to sit visibly on the gray mountain body rather than
+  // floating above it) so wisps overlap the ridge-gray zone where shade is
+  // meaningfully mixed toward uInk, not the pale near-fog base. z is pulled
+  // forward from -26..-6 to -15..-3 (same front-ridge z-span the ribbon
+  // occupies) to keep particles in front of the terrain's near face instead
+  // of behind it.
+  //
+  // x also changed from a flat -25..25 uniform spread to a center-weighted
+  // (triangular) distribution over the same -25..25 extent: the mobile/
+  // narrow-frustum camera only sees roughly +/-4 world units at this depth
+  // (the same frustum-narrowing documented in the ribbon comment above), so
+  // a uniform spread put ~85% of mist particles off-screen on mobile --
+  // confirmed empirically, 390-hero.png showed no haze at all with a flat
+  // spread even after the y/z repositioning above. The triangular spread
+  // keeps the same outer extent (still populates the wide desktop slope,
+  // where the ribbon's own x -8..17 band lives) while roughly doubling
+  // particle density near x=0, so mobile's narrow visible window still
+  // catches a visible cluster. Particle counts are unchanged from the brief.
   const mistCount = isMobile ? 120 : 260;
   const mistPos = new Float32Array(mistCount * 3);
   for (let i = 0; i < mistCount; i++) {
-    mistPos[i * 3] = (Math.random() - 0.5) * 50;
-    mistPos[i * 3 + 1] = Math.random() * 2.5 - 1.2;
-    mistPos[i * 3 + 2] = (Math.random() - 0.5) * 20 - 16;
+    mistPos[i * 3] = (Math.random() + Math.random() - 1) * 25;
+    mistPos[i * 3 + 1] = Math.random() * 5.0 + 1.0;
+    mistPos[i * 3 + 2] = (Math.random() - 0.5) * 12 - 9;
   }
   const mistGeo = new THREE.BufferGeometry();
   mistGeo.setAttribute('position', new THREE.BufferAttribute(mistPos, 3));
   const mistTexCanvas = document.createElement('canvas');
   mistTexCanvas.width = mistTexCanvas.height = 64;
   const mctx = mistTexCanvas.getContext('2d');
+  // Tinted a faint warm gray -- lighter than the mid-slope's ink-mixed gray
+  // (~rgb(173,171,166) at the ribbon's y-band) but noticeably darker/warmer
+  // than CREAM (242,239,233) -- so the same sprite reads as a bright wisp
+  // against the dark mountain body and a soft muted smudge against the
+  // cream sky, instead of vanishing into one or the other.
   const grad = mctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, 'rgba(255,255,253,0.9)');
-  grad.addColorStop(0.6, 'rgba(255,255,253,0.55)');
-  grad.addColorStop(1, 'rgba(255,255,253,0)');
+  grad.addColorStop(0, 'rgba(222,213,198,0.9)');
+  grad.addColorStop(0.6, 'rgba(222,213,198,0.55)');
+  grad.addColorStop(1, 'rgba(222,213,198,0)');
   mctx.fillStyle = grad;
   mctx.fillRect(0, 0, 64, 64);
+  // depthTest: false -- the mid-slope y-band above sits inside the front
+  // ridge's own z-extent, and near x=0 (behind the peak's radial bump) the
+  // opaque terrain surface reaches y~9, taller than the mist band's y<=6.
+  // Depth-testing against that surface culled almost every particle in
+  // exactly the x~0 column mobile's narrow frustum can see (confirmed: the
+  // y/z reposition alone fixed 1440-hero's haze but left 390-hero with
+  // none), so mist is drawn as a front atmospheric layer that always wins,
+  // consistent with "drifting mist" reading as a layer in front of the
+  // mountain rather than a set of objects embedded in its geometry.
   const mist = new THREE.Points(
     mistGeo,
     new THREE.PointsMaterial({
@@ -298,6 +342,7 @@ export function initScene(canvas) {
       size: 12,
       transparent: true,
       depthWrite: false,
+      depthTest: false,
       opacity: 0.85,
     })
   );
