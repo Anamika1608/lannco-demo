@@ -8,6 +8,14 @@ gsap.registerPlugin(ScrollTrigger);
 export function boot() {
   const api = initScene(document.querySelector('#scene'));
 
+  // "Our story" has no destination in this demo -- href="#" is kept as a
+  // visual CTA but must not natively jump the page to top. Install this on
+  // both the reduced-motion and normal paths, before the early return.
+  const teaseDiscover = document.querySelector('.tease .discover');
+  if (teaseDiscover) {
+    teaseDiscover.addEventListener('click', (e) => e.preventDefault());
+  }
+
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduced) {
     api.setRibbonDraw(1);
@@ -28,7 +36,7 @@ export function boot() {
     return;
   }
 
-  const lenis = new Lenis({ smoothWheel: true });
+  const lenis = new Lenis({ smoothWheel: true, anchors: true });
   lenis.on('scroll', ScrollTrigger.update);
   gsap.ticker.add((t) => lenis.raf(t * 1000));
   gsap.ticker.lagSmoothing(0);

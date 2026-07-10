@@ -458,7 +458,10 @@ export function initScene(canvas) {
     // shots/390-tease.png.
     ribbonMat.uniforms.uScrollFade.value =
       1.0 - THREE.MathUtils.smoothstep(scroll.p, 0.35, 0.85);
-    mist.rotation.y = t * 0.000012;
+    // Bounded oscillation, not monotonic drift: unbounded rotation would sweep
+    // the outer mist clusters' depthTest:false sprites through the camera
+    // plane over several minutes, compositing into a near-opaque cream veil.
+    mist.rotation.y = Math.sin(t * 0.00006) * 0.05;
     renderer.render(scene, camera);
   }
   renderer.setAnimationLoop(tick);
