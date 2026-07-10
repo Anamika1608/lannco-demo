@@ -11,6 +11,20 @@ export function boot() {
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduced) {
     api.setRibbonDraw(1);
+    // Keep the scene's scroll state correct without any animation: mirror the
+    // normal path's ScrollTrigger range ('top bottom' -> 'top top' on .tease)
+    // with a native passive scroll listener, so the camera pull-back / fog
+    // thickening track the user's own scrolling and the About text stays
+    // clear of the ribbon. No Lenis, no GSAP, no staggers in this branch.
+    const tease = document.querySelector('.tease');
+    const updateProgress = () => {
+      const rect = tease.getBoundingClientRect();
+      const p = Math.min(1, Math.max(0, (window.innerHeight - rect.top) / window.innerHeight));
+      api.setScrollProgress(p);
+    };
+    updateProgress();
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    window.addEventListener('resize', updateProgress, { passive: true });
     return;
   }
 
