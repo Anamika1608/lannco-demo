@@ -116,11 +116,21 @@ main {
   object-fit: cover;
   /* keep the peak (~43% across the source artwork) as the crop anchor at
      aspect ratios narrower/wider than the artwork's own 1.52:1. transform is
-     left entirely to GSAP (load-in scale, scroll pull-back, pointer
-     parallax) -- gsap composites x/y/scale set via separate tweens on the
+     left entirely to GSAP (load-in scale) -- gsap composites tweens on the
      same target into one transform internally, so nothing here fights it. */
   object-position: 43% 38%;
   will-change: transform;
+}
+
+/* JS-only: applied by overlay.js once the WebGL depth-displaced plane has
+   loaded both textures and painted a first frame, so the DOM <img> (a
+   no-JS/no-WebGL fallback only, past that point) stops painting under the
+   canvas. `!important` is required here -- the load-in timeline's opacity
+   tween writes .mountain's inline `style.opacity` on every tick for ~1.75s,
+   and a plain classed rule would lose that fight and get silently
+   overwritten back to visible on the tween's next frame. */
+.mountain.is-plane-ready {
+  opacity: 0 !important;
 }
 
 /* Fog blobs: ambient drift is animated via background-position (a
@@ -147,14 +157,14 @@ main {
 
 .fog-a {
   bottom: -8%;
-  opacity: 0.4;
+  opacity: 0.28;
   background-position: 8% center;
   animation: drift-a 40s ease-in-out infinite alternate;
 }
 
 .fog-b {
   bottom: 4%;
-  opacity: 0.3;
+  opacity: 0.22;
   background-position: 78% center;
   animation: drift-b 55s ease-in-out infinite alternate;
 }
@@ -175,6 +185,54 @@ main {
   background: var(--cream);
   opacity: 0;
   pointer-events: none;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Crisp DOM watermark (replaces the old baked-into-photo glyph, which
+   upscaled soft/blurry): sits above the mountain image + overlay canvas
+   (both z-index 0/1 inside .mountain-stage's own z:0 stacking context) but
+   below the headline/copy (z-index 1 on .hero's own stacking level). */
+.watermark {
+  position: absolute;
+  z-index: 0;
+  top: 42%;
+  right: 6%;
+  transform: translateY(-50%);
+  font-family: var(--serif);
+  font-size: clamp(11rem, 26vw, 24rem);
+  color: rgb(26 24 22 / 8%);
+  pointer-events: none;
+  user-select: none;
+  line-height: 1;
+}
+
+.seal-stamp {
+  position: absolute;
+  z-index: 0;
+  top: 62%;
+  right: 8%;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  background: var(--crimson);
+  color: var(--cream);
+  font-family: var(--serif);
+  font-size: 0.9rem;
+  line-height: 1;
+  opacity: 0.85;
+  pointer-events: none;
+  user-select: none;
+  border-radius: 1px;
 }
 
 .headline {
@@ -199,7 +257,6 @@ main {
 
 .accent {
   color: var(--crimson);
-  font-style: italic;
 }
 
 .discover {
@@ -336,6 +393,16 @@ main {
   .headline {
     max-width: 11ch;
     font-size: clamp(1.9rem, 7vw, 2.6rem);
+  }
+
+  .watermark {
+    top: 32%;
+    right: 0.25rem;
+    font-size: 9.5rem;
+  }
+
+  .seal-stamp {
+    display: none;
   }
 
   .ticker {
