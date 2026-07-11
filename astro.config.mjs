@@ -1,6 +1,6 @@
 import { defineConfig } from 'astro/config';
 
 export default defineConfig({
-  site: 'https://anamikaggarwal.me',
+  site: 'https://anamika1608.github.io',
   base: '/lannco-demo',
 });
