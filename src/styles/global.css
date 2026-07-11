@@ -25,15 +25,6 @@ body {
   overflow-x: hidden;
 }
 
-#scene {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  background: var(--cream);
-}
-
 .nav,
 main {
   position: relative;
@@ -102,17 +93,97 @@ main {
 .hero {
   position: relative;
   min-height: 100svh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 6rem clamp(1.25rem, 4vw, 3rem) 5.5rem;
+  justify-content: flex-start;
+  padding: clamp(4.5rem, 21vh, 13rem) clamp(1.25rem, 4vw, 3rem) 5.5rem;
+}
+
+/* 2.5D image stage: the mountain artwork + drifting fog, behind all text */
+.mountain-stage {
+  position: absolute;
+  inset: -3%;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mountain {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* keep the peak (~43% across the source artwork) as the crop anchor at
+     aspect ratios narrower/wider than the artwork's own 1.52:1. transform is
+     left entirely to GSAP (load-in scale, scroll pull-back, pointer
+     parallax) -- gsap composites x/y/scale set via separate tweens on the
+     same target into one transform internally, so nothing here fights it. */
+  object-position: 43% 38%;
+  will-change: transform;
+}
+
+/* Fog blobs: ambient drift is animated via background-position (a
+   non-transform property) rather than translateX, specifically so it can't
+   collide with the pointer-parallax translate GSAP applies to these same
+   elements' `transform` property -- two independent CSS properties, no
+   fighting, both visibly composited. */
+.fog {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 42vh;
+  background-image: radial-gradient(
+    ellipse 45% 100% at 50% 50%,
+    var(--cream) 0%,
+    rgb(242 239 233 / 0%) 72%
+  );
+  background-repeat: no-repeat;
+  background-size: 220% 100%;
+  filter: blur(30px);
+  pointer-events: none;
+  will-change: transform, background-position;
+}
+
+.fog-a {
+  bottom: -8%;
+  opacity: 0.4;
+  background-position: 8% center;
+  animation: drift-a 40s ease-in-out infinite alternate;
+}
+
+.fog-b {
+  bottom: 4%;
+  opacity: 0.3;
+  background-position: 78% center;
+  animation: drift-b 55s ease-in-out infinite alternate;
+}
+
+@keyframes drift-a {
+  from { background-position: 4% center; }
+  to { background-position: 58% center; }
+}
+
+@keyframes drift-b {
+  from { background-position: 82% center; }
+  to { background-position: 38% center; }
+}
+
+.fog-veil {
+  position: absolute;
+  inset: 0;
+  background: var(--cream);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .headline {
+  position: relative;
+  z-index: 1;
   font-family: var(--serif);
   font-weight: 500;
-  font-size: clamp(2.6rem, 7.5vw, 6.2rem);
-  line-height: 1.04;
+  font-size: clamp(2rem, 3.4vw, 3.1rem);
+  line-height: 1.32;
   max-width: 12ch;
 }
 
@@ -132,22 +203,44 @@ main {
 }
 
 .discover {
-  margin-top: 2.4rem;
+  position: relative;
+  z-index: 1;
+  margin-top: 1.6rem;
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.9rem;
   min-height: 44px;
   color: var(--ink);
   text-decoration: none;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
 .discover .arrow {
-  color: var(--crimson);
+  position: relative;
+  display: inline-block;
+  width: 3em;
+  height: 1px;
+  background: var(--crimson);
+  /* hide the literal "→" glyph via color, not overflow/font-size: the
+     arrowhead below is drawn with a ::after that deliberately overflows this
+     1px-tall line box vertically, so overflow:hidden here would clip it. */
+  color: transparent;
   transition: transform 0.3s ease;
+}
+
+.discover .arrow::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 0.5em;
+  height: 0.5em;
+  border-top: 1px solid var(--crimson);
+  border-right: 1px solid var(--crimson);
+  transform: translateY(-50%) rotate(45deg);
 }
 
 .discover:hover .arrow {
@@ -156,64 +249,54 @@ main {
 
 .scroll-hint {
   position: absolute;
-  bottom: 5rem;
+  z-index: 1;
+  bottom: 4%;
   left: clamp(1.25rem, 4vw, 3rem);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
   font-size: 0.62rem;
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--gray);
 }
 
-.watermark {
-  position: absolute;
-  top: 50%;
-  right: clamp(0.5rem, 6vw, 6rem);
-  transform: translateY(-52%);
-  font-family: var(--serif);
-  font-size: clamp(11rem, 30vw, 26rem);
-  color: rgb(26 24 22 / 7%);
-  pointer-events: none;
-  user-select: none;
-  line-height: 1;
+.scroll-hint::after {
+  content: '';
+  width: 1px;
+  height: 1.1em;
+  background: linear-gradient(to bottom, var(--gray), var(--crimson));
 }
 
 .ticker {
   position: absolute;
-  bottom: 1.8rem;
-  left: clamp(1.25rem, 4vw, 3rem);
-  right: clamp(1.25rem, 4vw, 3rem);
-  display: flex;
-  gap: clamp(1.2rem, 4vw, 3rem);
-  font-size: 0.66rem;
-  letter-spacing: 0.24em;
+  z-index: 1;
+  bottom: clamp(3.5rem, 7vh, 5.5rem);
+  right: clamp(1.25rem, 4vw, 3.5rem);
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: clamp(1rem, 2.4vw, 1.8rem);
+  font-size: 0.64rem;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--gray);
   padding-bottom: 0.7rem;
+  white-space: nowrap;
 }
 
 .ticker-line {
   position: absolute;
   bottom: 0;
   left: 0;
+  right: 0;
   height: 1px;
-  width: 100%;
-  background: rgb(26 24 22 / 15%);
-}
-
-.ticker-line::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--crimson);
-  transform-origin: left;
-  animation: sweep 9s ease-in-out infinite;
-}
-
-@keyframes sweep {
-  0% { transform: scaleX(0); }
-  55% { transform: scaleX(1); transform-origin: left; }
-  56% { transform-origin: right; }
-  100% { transform: scaleX(0); transform-origin: right; }
+  background: linear-gradient(
+    to right,
+    var(--crimson) 0%,
+    var(--crimson) 15%,
+    rgb(26 24 22 / 15%) 15%,
+    rgb(26 24 22 / 15%) 100%
+  );
 }
 
 /* ---------- tease ---------- */
@@ -246,25 +329,29 @@ main {
     display: none;
   }
 
-  .watermark {
-    right: 0.25rem;
-    font-size: 9.5rem;
-    top: 32%;
+  .hero {
+    padding-top: clamp(5.5rem, 24vh, 10rem);
   }
 
   .headline {
-    margin-top: 8vh;
+    max-width: 11ch;
+    font-size: clamp(1.9rem, 7vw, 2.6rem);
   }
 
   .ticker {
+    left: clamp(1.25rem, 4vw, 3rem);
+    right: clamp(1.25rem, 4vw, 3rem);
+    justify-content: flex-start;
     flex-wrap: wrap;
     gap: 0.9rem 1.4rem;
+    bottom: 3.6rem;
+    white-space: normal;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ticker-line::after {
+  .fog-a,
+  .fog-b {
     animation: none;
-    transform: scaleX(1);
   }
 }

@@ -34,8 +34,6 @@ import '../styles/global.css';
     />
   </head>
   <body>
-    <canvas id="scene" aria-hidden="true"></canvas>
-
     <header class="nav">
       <a class="wordmark" href={import.meta.env.BASE_URL}>LANNCO</a>
       <nav class="links">
@@ -50,7 +48,16 @@ import '../styles/global.css';
 
     <main>
       <section class="hero">
-        <span class="watermark" aria-hidden="true">嵐</span>
+        <div class="mountain-stage" aria-hidden="true">
+          <img
+            class="mountain"
+            src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/mountain.jpg`}
+            alt=""
+          />
+          <div class="fog fog-a"></div>
+          <div class="fog fog-b"></div>
+          <div class="fog-veil"></div>
+        </div>
         <h1 class="headline">
           <span class="line"><span class="line-inner">Connecting</span></span>
           <span class="line"><span class="line-inner">Capital.</span></span>

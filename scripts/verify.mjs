@@ -22,8 +22,12 @@ try {
       await page.goto(url, { waitUntil: 'networkidle' });
       await page.waitForTimeout(2500); // let load-in choreography finish
 
-      if ((await page.locator('canvas#scene').count()) === 0) {
-        problems.push(`${width}px: canvas#scene missing`);
+      const mountainLoaded = await page
+        .locator('.mountain-stage img')
+        .evaluate((img) => img.naturalWidth > 0)
+        .catch(() => false);
+      if (!mountainLoaded) {
+        problems.push(`${width}px: .mountain-stage img missing or failed to load`);
       }
       const overflow = await page.evaluate(
         () => document.scrollingElement.scrollWidth - window.innerWidth
